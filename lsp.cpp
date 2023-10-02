@@ -574,6 +574,8 @@ keep_reading:;
     }
 
     void unmanage_buffer(yed_buffer *buffer) {
+        if (this->state != RUNNING) { return; }
+
         auto search = find(this->managed_buffers.begin(), this->managed_buffers.end(), buffer);
         if (search == this->managed_buffers.end()) {
             return;
@@ -583,6 +585,8 @@ keep_reading:;
     }
 
     void manage_buffer(yed_buffer *buffer) {
+        if (this->state != RUNNING) { return; }
+
         this->unmanage_buffer(buffer);
         this->managed_buffers.push_back(buffer);
         this->send_opened_buffer(buffer);
@@ -591,6 +595,8 @@ keep_reading:;
     }
 
     void handle_buffer_write(yed_buffer *buffer) {
+        if (this->state != RUNNING) { return; }
+
         if (!is_managed_buffer(buffer)) {
             this->manage_buffer(buffer);
         } else {
@@ -603,6 +609,8 @@ keep_reading:;
         int start_char;
         int end_line;
         int end_char;
+
+        if (this->state != RUNNING) { return; }
 
         if (buffer->flags & BUFF_SPECIAL
         ||  buffer->kind != BUFF_KIND_FILE) {
