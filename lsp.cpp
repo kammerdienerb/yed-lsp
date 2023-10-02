@@ -542,9 +542,9 @@ keep_reading:;
         return this->request("initialize",
 
             // Params
-            {{ "processId",    getpid()            },
-             { "capabilities", json::object()      },
-             { "rootUri",      ys->working_dir     }
+            {{ "processId",    getpid()                            },
+             { "capabilities", json::object()                      },
+             { "rootUri",      string("file://") + ys->working_dir }
             },
 
             // Callback
