@@ -787,6 +787,7 @@ static void pump(yed_event *event) {
             rq.response.map([&](const json &js) {
                 if (js.contains("error")) {
                     EDBG("response error for request with id %lu", (unsigned long)rq.id);
+                    EDBG("%s", js.dump(2).c_str());
                     rq.error = true;
                 }
 
