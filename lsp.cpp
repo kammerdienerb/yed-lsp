@@ -741,6 +741,14 @@ static void define_server(const string &name, const string &server_cmd, const ve
     for (const auto &ft : conp->ft_names) {
         ft_to_server.insert(pair<string, Server_Connection&>(ft, *conp));
     }
+
+    tree_it(yed_buffer_name_t, yed_buffer_ptr_t) it;
+    tree_traverse(ys->buffers, it) {
+        if (find(conp->ft_names.begin(), conp->ft_names.end(), tree_it_key(it)) != conp->ft_names.end()) {
+            conp->start();
+            break;
+        }
+    }
 }
 
 
