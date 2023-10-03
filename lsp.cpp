@@ -538,6 +538,23 @@ keep_reading:;
         );
     }
 
+    void finish_initialization() {
+        this->send_initialized();
+
+        this->state = RUNNING;
+
+        DBG("the server has been initialized!");
+
+        tree_it(yed_buffer_name_t, yed_buffer_ptr_t) it;
+        tree_traverse(ys->buffers, it) {
+            const char *ft_name = yed_get_ft_name(tree_it_val(it)->ft);
+            if (ft_name == NULL) { continue; }
+            if (find(this->ft_names.begin(), this->ft_names.end(), ft_name) != this->ft_names.end()) {
+                this->manage_buffer(tree_it_val(it));
+            }
+        }
+    }
+
     optional<request_id> send_initialize() {
         return this->request("initialize",
 
@@ -552,18 +569,7 @@ keep_reading:;
                 if (rq.error) {
                     EDBG("initialize request failed");
                 } else {
-                    this->send_initialized();
-
-                    this->state = RUNNING;
-
-                    DBG("the server has been initialized!");
-
-                    tree_it(yed_buffer_name_t, yed_buffer_ptr_t) it;
-                    tree_traverse(ys->buffers, it) {
-                        if (find(this->ft_names.begin(), this->ft_names.end(), tree_it_key(it)) != this->ft_names.end()) {
-                            this->manage_buffer(tree_it_val(it));
-                        }
-                    }
+                    this->finish_initialization();
                 }
             ));
     }
