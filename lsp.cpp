@@ -751,7 +751,10 @@ static void define_server(const string &name, const string &server_cmd, const ve
     tree_it(yed_buffer_name_t, yed_buffer_ptr_t) it;
     tree_traverse(ys->buffers, it) {
         if (find(conp->ft_names.begin(), conp->ft_names.end(), tree_it_key(it)) != conp->ft_names.end()) {
-            conp->start();
+            if (!conp->start()) {
+                del_server(conp->name);
+                return;
+            }
             break;
         }
     }
@@ -855,7 +858,10 @@ static void buffer_event_server_action(yed_event *event, function<void(Server_Co
                 case Server_Connection::INITIALIZED: /* Not ready yet. */
                     return;
                 case Server_Connection::CREATED:
-                    if (!con.start()) { return; }
+                    if (!con.start()) {
+                        del_server(con.name);
+                        return;
+                    }
                     break;
                 case Server_Connection::RUNNING:
                     break;
