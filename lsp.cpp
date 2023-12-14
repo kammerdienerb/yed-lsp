@@ -778,51 +778,66 @@ static void broadcast(const std::string &method, const json &notif) {
 static void unload(yed_plugin *self) {
 }
 
+struct Save_Broadcast {
+    std::string method;
+    json        notif;
+
+    Save_Broadcast(const std::string &_method, const json &&_notif)
+        : method(_method), notif(std::move(_notif)) {}
+};
+
 static void pump(yed_event *event) {
-    lock_guard<mutex> lock(servers_lock);
+    std::vector<Save_Broadcast> broadcasts;
 
-    for (auto &serv : servers) {
-        Server_Connection &con = serv.second;
+    { lock_guard<mutex> lock(servers_lock);
 
-        lock_guard<mutex> lck(con.mtx);
+        for (auto &serv : servers) {
+            Server_Connection &con = serv.second;
 
-        for (const auto &p : con.problems) {
-            EDBG("PROBLEM:\n%s", p.c_str());
-        }
-        con.problems.clear();
+            lock_guard<mutex> lck(con.mtx);
 
-        for (const auto &n : con.notifications) {
-            if (n.contains("method")) {
-                broadcast(n["method"], n);
+            for (const auto &p : con.problems) {
+                EDBG("PROBLEM:\n%s", p.c_str());
             }
-        }
-        con.notifications.clear();
+            con.problems.clear();
 
-        for (auto &r : con.requests) {
-            Request &rq = r.second;
-
-            rq.response.map([&](const json &js) {
-                if (js.contains("error")) {
-                    EDBG("response error for request with id %lu", (unsigned long)rq.id);
-                    EDBG("%s", js.dump(2).c_str());
-                    rq.error = true;
+            for (const auto &n : con.notifications) {
+                if (n.contains("method")) {
+                    broadcasts.emplace_back(n["method"], std::move(n));
                 }
+            }
+            con.notifications.clear();
 
-                if (rq.on_response) {
-                    rq.handle_response();
+            for (auto &r : con.requests) {
+                Request &rq = r.second;
+
+                rq.response.map([&](const json &js) {
+                    if (js.contains("error")) {
+                        EDBG("response error for request with id %lu", (unsigned long)rq.id);
+                        EDBG("%s", js.dump(2).c_str());
+                        rq.error = true;
+                    }
+
+                    if (rq.on_response) {
+                        rq.handle_response();
+                    } else {
+                        broadcasts.emplace_back(rq.method, std::move(js));
+                    }
+                });
+            }
+
+            for (auto it = con.requests.begin(); it != con.requests.end();) {
+                if (it->second.has_response()) {
+                    it = con.requests.erase(it);
                 } else {
-                    broadcast(rq.method, js);
+                    ++it;
                 }
-            });
-        }
-
-        for (auto it = con.requests.begin(); it != con.requests.end();) {
-            if (it->second.has_response()) {
-                it = con.requests.erase(it);
-            } else {
-                ++it;
             }
         }
+    }
+
+    for (auto &b : broadcasts) {
+        broadcast(b.method, b.notif);
     }
 }
 
