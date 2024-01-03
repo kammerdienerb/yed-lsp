@@ -137,7 +137,7 @@ struct Edit {
 };
 
 struct Server_Connection {
-    enum Server_State { CREATED, INITIALIZED, RUNNING, FAILED_TO_START };
+    enum Server_State { CREATED, INITIALIZED, RUNNING, FAILED_TO_START, HANGUP };
 
     int                        rd_fd      = -1;
     int                        wr_fd      = -1;
@@ -200,7 +200,7 @@ again:;
         if (this->state == INITIALIZED || this->state == RUNNING) {
             EDBG("the server is already started!");
             return false;
-        } else if (this->state == FAILED_TO_START) {
+        } else if (this->state == FAILED_TO_START || this->state == HANGUP) {
             return false;
         }
 
@@ -221,6 +221,7 @@ again:;
         pid_t pid = fork();
 
         if (pid < 0) {
+            this->state = FAILED_TO_START;
             errno = 0;
             close(fds_to_child[0]);   close(fds_to_child[1]);
             close(fds_from_child[0]); close(fds_from_child[1]);
@@ -253,6 +254,7 @@ again:;
         (void)err;
 
         if (pipe(this->sig_fds) != 0) {
+            this->state = FAILED_TO_START;
             errno = 0;
             EDBG("failed to open thread signal pipe");
             return false;
@@ -296,6 +298,13 @@ again:;
             /* Check if our connection is being closed and we've been signaled to stop. */
             if (pfds[1].revents & POLLIN) { return; }
 
+            /* Check if the pipe has closed or a pipe error has occurred. */
+            if (!(pfds[0].revents & POLLIN)) {
+                lock_guard<mutex> lck(con.mtx);
+                con.problems.emplace_back("server hangup:" + con.cmd);
+                con.state = HANGUP;
+                return;
+            }
 
 keep_reading:;
             while ((n = read(con.rd_fd, buff, sizeof(buff) - 1)) > 0) {
