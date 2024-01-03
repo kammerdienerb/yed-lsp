@@ -879,6 +879,7 @@ static void buffer_event_server_action(yed_event *event, function<void(Server_Co
 
             switch (con.state) {
                 case Server_Connection::FAILED_TO_START:
+                case Server_Connection::HANGUP:
                 case Server_Connection::INITIALIZED: /* Not ready yet. */
                     return;
                 case Server_Connection::CREATED:
