@@ -170,29 +170,38 @@ again:;
             }
         }
 
-        if (this->state == INITIALIZED || this->state == RUNNING) {
-            // Signal pull_thread to stop
-            char z = 0;
-            write(this->sig_fds[1], &z, 1);
-
-            // Wait for it to stop
-            this->thr.join();
-
-            close(this->sig_fds[1]);
-            close(this->sig_fds[0]);
-
-            // Close server pipes and kill it
-            if (this->rd_fd >= 0) {
-                close(this->rd_fd);
-                this->rd_fd = -1;
+        switch (this->state) {
+            case CREATED:
+            case FAILED_TO_START:
+                break;
+            case INITIALIZED:
+            case RUNNING:
+            {
+                // Signal pull_thread to stop
+                char z = 0;
+                write(this->sig_fds[1], &z, 1);
+                /* fallthrough */
             }
-            if (this->wr_fd >= 0) {
-                close(this->wr_fd);
-                this->wr_fd = -1;
-            }
-            if (this->server_pid >= 0) {
-                kill(this->server_pid, SIGKILL);
-            }
+            case HANGUP:
+                // Wait for it to stop
+                this->thr.join();
+
+                close(this->sig_fds[1]);
+                close(this->sig_fds[0]);
+
+                // Close server pipes and kill it
+                if (this->rd_fd >= 0) {
+                    close(this->rd_fd);
+                    this->rd_fd = -1;
+                }
+                if (this->wr_fd >= 0) {
+                    close(this->wr_fd);
+                    this->wr_fd = -1;
+                }
+                if (this->server_pid >= 0) {
+                    kill(this->server_pid, SIGKILL);
+                }
+                break;
         }
     }
 
@@ -256,6 +265,9 @@ again:;
         if (pipe(this->sig_fds) != 0) {
             this->state = FAILED_TO_START;
             errno = 0;
+            close(fds_to_child[1]);
+            close(fds_from_child[0]);
+            kill(this->server_pid, SIGKILL);
             EDBG("failed to open thread signal pipe");
             return false;
         }
